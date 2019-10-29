@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <iostream>
 using namespace std;
 
@@ -5,12 +7,9 @@ using namespace std;
 #include <GLFW/glfw3.h>
 #include <GL/gl.h>
 
-#define WINDOW_TITLE "Particles"
-
 static GLFWwindow *window = nullptr;
 
-static const int width = 512, height = 512;
-static const bool enableVSync = true;
+static Config config;
 
 int main()
 {
@@ -23,7 +22,7 @@ int main()
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	window = glfwCreateWindow(width, height, WINDOW_TITLE, nullptr, nullptr);
+	window = glfwCreateWindow(config.width, config.height, WINDOW_TITLE, nullptr, nullptr);
 	if (window == nullptr) {
 		cerr << "Failed to open window" << endl;
 		return 1;
@@ -39,7 +38,7 @@ int main()
 
 	glClearColor(0.0, 0.0, 0.0, 1.0);
 
-	glfwSwapInterval(enableVSync);
+	glfwSwapInterval(config.enableVSync);
 	while (!glfwWindowShouldClose(window)) {
 		glClear(GL_COLOR_BUFFER_BIT);
 
