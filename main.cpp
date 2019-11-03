@@ -1,4 +1,5 @@
 #include "config.h"
+#include "shaders.h"
 
 #include <iostream>
 using namespace std;
@@ -8,16 +9,47 @@ using namespace std;
 #include <GL/gl.h>
 
 static GLFWwindow *window = nullptr;
+static int frames = 0;
 
 static Config config;
 
+static string vertexShaderCode = "\
+#version 430\n\
+out vec2 uv;\n\
+in vec2 pos;\n\
+void main() {\n\
+	gl_Position = vec4(pos.x, pos.y, 0.0, 1.0);\n\
+	uv = 0.5 * pos + 0.5;\n\
+}";
+
+static string fragmentShaderCode = "\
+#version 430\n\
+in vec2 uv;\n\
+uniform sampler2D sampler;\n\
+out vec3 color;\n\
+void main() {\n\
+	color = texture(sampler, uv).rgb;\n\
+}";
+
+
+static void checkForErrors(string where)
+{
+	GLenum e = glGetError();
+	if (e != GL_NO_ERROR) {
+		cerr << "OpenGL error in " << where << ": " <<  gluErrorString(e) << " (" << e << ")" << endl;
+		exit(1);
+	}
+}
+
 int main()
 {
+	// Initialize GLFW
 	if (!glfwInit()) {
 		cerr << "Failed to initialize GLFW" << endl;
 		return 1;
 	}
 
+	// Create window
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
@@ -36,14 +68,76 @@ int main()
 		return 1;
 	}
 
+
+	// Create the main texture
+	GLuint textureID;
+	{
+		auto sz = config.width * config.height;
+		float *data = new float[sz * 3];
+		for (int i = 0; i < sz; ++i) {
+			float c = float(i) / sz;
+			data[i * 3 + 0] = c;
+			data[i * 3 + 1] = c;
+			data[i * 3 + 2] = c;
+		}
+
+		glGenTextures(1, &textureID);
+		glBindTexture(GL_TEXTURE_2D, textureID);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, config.width, config.height, 0, GL_RGB, GL_FLOAT, data);
+		delete[] data;
+	}
+
+	// Create the render program
+	GLuint vertexID = createShader(vertexShaderCode, GL_VERTEX_SHADER, "Vertex shader");
+	GLuint fragmentID = createShader(fragmentShaderCode, GL_FRAGMENT_SHADER, "Fragment shader");
+	GLuint renderProgramID = linkProgram({vertexID, fragmentID});
+
+	// Two triangles
+	GLuint vertArray;
+	glGenVertexArrays(1, &vertArray);
+	glBindVertexArray(vertArray);
+
+	GLuint posBuf;
+	glGenBuffers(1, &posBuf);
+	glBindBuffer(GL_ARRAY_BUFFER, posBuf);
+	float data[] = {
+		-1.0f, -1.0f,
+		-1.0f,  1.0f,
+		 1.0f, -1.0f,
+		 1.0f,  1.0f
+	};
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float)*8, data, GL_STREAM_DRAW);
+	GLint posPtr = glGetAttribLocation(renderProgramID, "pos");
+	glVertexAttribPointer(posPtr, 2, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(posPtr);
+
 	glClearColor(0.0, 0.0, 0.0, 1.0);
 
 	glfwSwapInterval(config.enableVSync);
+	glfwSetTime(0.0);
 	while (!glfwWindowShouldClose(window)) {
 		glClear(GL_COLOR_BUFFER_BIT);
 
+		glUseProgram(renderProgramID);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, textureID);
+		glUniform1i(glGetUniformLocation(renderProgramID, "sampler"), 0);
+
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
 		glfwSwapBuffers(window);
 		glfwPollEvents();
+
+		++frames;
+		double time = glfwGetTime();
+		if (time >= 1.0) {
+			glfwSetTime(0.0);
+			cerr << "FPS: " << frames / time << endl;
+			frames = 0;
+		}
 	}
 
 	return 0;
