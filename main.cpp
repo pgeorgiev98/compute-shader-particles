@@ -31,6 +31,19 @@ void main() {\n\
 	color = texture(sampler, uv).rgb;\n\
 }";
 
+// TODO: Remove hardcoded width and height
+static string computeShaderCode = "\
+#version 430\n\
+layout(binding = 0, rgba32f) uniform image2D outputTexture;\n\
+layout(local_size_x = 16, local_size_y = 16) in;\n\
+void main() {\n\
+	ivec2 storePos = ivec2(gl_GlobalInvocationID.xy);\n\
+	float r = storePos.x / 512.0;\n\
+	float g = storePos.y / 512.0;\n\
+	float b = 0.0;\n\
+	imageStore(outputTexture, storePos, vec4(r, g, b, 1.0));\n\
+}";
+
 
 static void checkForErrors(string where)
 {
@@ -73,26 +86,31 @@ int main()
 	GLuint textureID;
 	{
 		auto sz = config.width * config.height;
-		float *data = new float[sz * 3];
+		float *data = new float[sz * 4];
 		for (int i = 0; i < sz; ++i) {
 			float c = float(i) / sz;
-			data[i * 3 + 0] = c;
-			data[i * 3 + 1] = c;
-			data[i * 3 + 2] = c;
+			data[i * 4 + 0] = c;
+			data[i * 4 + 1] = c;
+			data[i * 4 + 2] = c;
+			data[i * 4 + 3] = 1.0;
 		}
 
 		glGenTextures(1, &textureID);
 		glBindTexture(GL_TEXTURE_2D, textureID);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, config.width, config.height, 0, GL_RGB, GL_FLOAT, data);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, config.width, config.height, 0, GL_RGBA, GL_FLOAT, data);
 		delete[] data;
+		checkForErrors("Generate texture");
 	}
 
 	// Create the render program
 	GLuint vertexID = createShader(vertexShaderCode, GL_VERTEX_SHADER, "Vertex shader");
 	GLuint fragmentID = createShader(fragmentShaderCode, GL_FRAGMENT_SHADER, "Fragment shader");
 	GLuint renderProgramID = linkProgram({vertexID, fragmentID});
+
+	// Create the shader program
+	GLuint computeProgramID = linkProgram({createShader(computeShaderCode, GL_COMPUTE_SHADER, "Compute shader")});
 
 	// Two triangles
 	GLuint vertArray;
@@ -119,6 +137,16 @@ int main()
 	glfwSetTime(0.0);
 	while (!glfwWindowShouldClose(window)) {
 		glClear(GL_COLOR_BUFFER_BIT);
+
+		glUseProgram(computeProgramID);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, textureID);
+		glBindImageTexture(0, textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+		glUniform1i(glGetUniformLocation(computeProgramID, "outputTexture"), 0);
+		glDispatchCompute(config.width / 16, config.height / 16, 1);
+		checkForErrors("Compute");
+
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
 		glUseProgram(renderProgramID);
 
