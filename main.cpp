@@ -39,26 +39,59 @@ layout(local_size_x = 16, local_size_y = 16) in;\n\
 float w = ${width}, h = ${height};\n\
 void main() {\n\
 	ivec2 pos = ivec2(gl_GlobalInvocationID.xy);\n\
-	uint v = imageAtomicExchange(particleCountTexture, pos, 0);\n\
-	imageStore(outputTexture, pos, vec4(v / 10.0, 0.0, 0.0, 1.0));\n\
+	float v = imageAtomicExchange(particleCountTexture, pos, 0);\n\
+	imageStore(outputTexture, pos, vec4(v * ${colorRedMul} + ${colorRedAdd}, v * ${colorGreenMul} + ${colorGreenAdd}, v * ${colorBlueMul} + ${colorBlueAdd}, 1.0));\n\
 }";
 
 static string updateParticlesComputeShaderCode = "\
 #version 430\n\
-layout(binding = 1, r32ui) uniform uimage2D particleCountTexture;\n\
+layout(binding = 1, r32ui) uniform coherent uimage2D particleCountTexture;\n\
 layout(binding = 2, rgba32f) uniform image2D particlePositionTexture;\n\
+layout(binding = 3, r32f) uniform image2D particleMassTexture;\n\
 layout(local_size_x = 16, local_size_y = 16) in;\n\
+uniform float forceMultiplier;\
+uniform vec2 cursorPos;\
 float w = ${width}, h = ${height};\n\
 void main() {\n\
 	ivec2 id = ivec2(gl_GlobalInvocationID.xy);\n\
-	vec4 position = imageLoad(particlePositionTexture, id);\n\
-	imageAtomicAdd(particleCountTexture, ivec2(position.x, position.y), 1);\n\
+	vec4 v = imageLoad(particlePositionTexture, id);\n\
+	float mass = imageLoad(particleMassTexture, id).r;\n\
+	\
+	float dx = v.x - cursorPos.x;\n\
+	float dy = v.y - cursorPos.y;\n\
+	float dist = dx * dx + dy * dy;\n\
+	if (dist < ${minimumDistance}) dist = ${minimumDistance};\n\
+	float c = forceMultiplier / mass;\n\
+	v.z += c * dx / dist;\n\
+	v.w += c * dy / dist;\n\
+	v.x -= v.z;\n\
+	v.y -= v.w;\n\
+	\
+	//if (v.x < 0.0) { v.x = 0.0; v.z = 0.0; }\n\
+	//if (v.x > ${width}) { v.x = ${width}; v.z = 0.0; }\n\
+	//if (v.y < 0.0) { v.y = 0.0; v.w = 0.0; }\n\
+	//if (v.y > ${height}) { v.y = ${height}; v.w = 0.0; }\n\
+	\
+	if (v.x < 0.0) { v.x = 0.0; v.z *= -0.5; v.w *= 0.5; }\n\
+	if (v.x > ${width}) { v.x = ${width}; v.z *= -0.5; v.w *= 0.5; }\n\
+	if (v.y < 0.0) { v.y = 0.0; v.w *= -0.5; v.z *= 0.5; }\n\
+	if (v.y > ${height}) { v.y = ${height}; v.w *= -0.5; v.z *= 0.5; }\n\
+	\
+	imageStore(particlePositionTexture, id, v);\n\
+	imageAtomicAdd(particleCountTexture, ivec2(v.x, v.y), 1);\n\
 }";
 
 string formatShaderCode(string shaderCode)
 {
 	for (auto p : {pair<string, string>("width", to_string(config.width)),
-				   {"height", to_string(config.height)}}) {
+				   {"height", to_string(config.height)},
+				   {"colorRedMul", to_string(config.colorRedMul)},
+				   {"colorRedAdd", to_string(config.colorRedAdd)},
+				   {"colorGreenMul", to_string(config.colorGreenMul)},
+				   {"colorGreenAdd", to_string(config.colorGreenAdd)},
+				   {"colorBlueMul", to_string(config.colorBlueMul)},
+				   {"colorBlueAdd", to_string(config.colorBlueAdd)},
+				   {"minimumDistance", to_string(config.minimumDistance)}}) {
 		string s = "${" + p.first + "}";
 		for (;;) {
 			auto i = shaderCode.find(s);
@@ -71,15 +104,6 @@ string formatShaderCode(string shaderCode)
 }
 
 
-static void checkForErrors(string where)
-{
-	GLenum e = glGetError();
-	if (e != GL_NO_ERROR) {
-		cerr << "OpenGL error in " << where << ": " <<  gluErrorString(e) << " (" << e << ")" << endl;
-		exit(1);
-	}
-}
-
 int main()
 {
 	// Initialize GLFW
@@ -91,7 +115,7 @@ int main()
 	// Create window
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+	glfwWindowHint(GLFW_RESIZABLE, false);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	window = glfwCreateWindow(config.width, config.height, WINDOW_TITLE, nullptr, nullptr);
 	if (window == nullptr) {
@@ -127,7 +151,6 @@ int main()
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, config.width, config.height, 0, GL_RGBA, GL_FLOAT, data);
 		delete[] data;
-		checkForErrors("Generate texture");
 	}
 
 	// Create a integer texture, where every pixel's value is the number of particles
@@ -144,7 +167,6 @@ int main()
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, config.width, config.height, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, data);
 		delete[] data;
-		checkForErrors("Generate particle count texture");
 	}
 
 	// Create a texture in which the particle coordinates will be stored
@@ -168,7 +190,26 @@ int main()
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, sizeX, sizeY, 0, GL_RGBA, GL_FLOAT, data);
 		delete[] data;
-		checkForErrors("Generate particle position texture");
+	}
+
+	// Create a texture in which the particle masses will be stored
+	GLuint particleMassTextureID;
+	{
+		int sizeX = config.particleCountX;
+		int sizeY = config.particleCountY;
+
+		auto sz = sizeX * sizeY;
+		float *data = new float[sz];
+		for (int i = 0; i < sz; ++i) {
+			data[i] = config.massMin + (config.massMax - config.massMin) * (float(rand()) / RAND_MAX);
+		}
+
+		glGenTextures(1, &particleMassTextureID);
+		glBindTexture(GL_TEXTURE_2D, particleMassTextureID);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, sizeX, sizeY, 0, GL_RED, GL_FLOAT, data);
+		delete[] data;
 	}
 
 	// Create the render program
@@ -206,26 +247,40 @@ int main()
 	while (!glfwWindowShouldClose(window)) {
 		glClear(GL_COLOR_BUFFER_BIT);
 
+		double xpos, ypos;
+		glfwGetCursorPos(window, &xpos, &ypos);
+		ypos = config.height - ypos;
+
+		float forceMultiplier = 0.0;
+		if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)
+			forceMultiplier = -1.0;
+		else if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
+			forceMultiplier = 1.0;
+		forceMultiplier *= config.forceMultiplier;
+
 		glActiveTexture(GL_TEXTURE0);
 		glBindImageTexture(0, textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
 		glActiveTexture(GL_TEXTURE0 + 1);
 		glBindImageTexture(1, particleCountTextureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
 		glActiveTexture(GL_TEXTURE0 + 2);
 		glBindImageTexture(2, particlePositionTextureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+		glActiveTexture(GL_TEXTURE0 + 3);
+		glBindImageTexture(3, particleMassTextureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
 
 		// Update the particles
 		glUseProgram(updateParticlesProgramID);
 		glUniform1i(glGetUniformLocation(updateParticlesProgramID, "particleCountTexture"), 1);
 		glUniform1i(glGetUniformLocation(updateParticlesProgramID, "particlePositionTexture"), 2);
+		glUniform1i(glGetUniformLocation(updateParticlesProgramID, "particleMassTexture"), 3);
+		glUniform2f(glGetUniformLocation(updateParticlesProgramID, "cursorPos"), xpos, ypos);
+		glUniform1f(glGetUniformLocation(updateParticlesProgramID, "forceMultiplier"), forceMultiplier);
 		glDispatchCompute(config.particleCountX / 16, config.particleCountY / 16, 1);
-		checkForErrors("Dispatch update particles compute shader");
 
 		// Render the output texture
 		glUseProgram(renderTexureProgramID);
 		glUniform1i(glGetUniformLocation(updateParticlesProgramID, "outputTexture"), 0);
 		glUniform1i(glGetUniformLocation(renderTexureProgramID, "particleCountTexture"), 1);
 		glDispatchCompute(config.width / 16, config.height / 16, 1);
-		checkForErrors("Dispatch render texture compute shader");
 
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
