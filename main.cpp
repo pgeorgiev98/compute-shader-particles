@@ -31,26 +31,28 @@ void main() {\n\
 	color = texture(sampler, uv).rgb;\n\
 }";
 
-static string clearTextureComputeShaderCode = "\
+static string renderTextureComputeShaderCode = "\
 #version 430\n\
-layout(binding = 1, r32i) uniform iimage2D particleCountTexture;\n\
+layout(binding = 0, rgba32f) uniform writeonly image2D outputTexture;\n\
+layout(binding = 1, r32ui) uniform uimage2D particleCountTexture;\n\
 layout(local_size_x = 16, local_size_y = 16) in;\n\
 float w = ${width}, h = ${height};\n\
 void main() {\n\
 	ivec2 pos = ivec2(gl_GlobalInvocationID.xy);\n\
-	imageStore(particleCountTexture, pos, ivec4(pos.x + pos.y * ${height}, 0, 0, 0));\n\
+	uint v = imageAtomicExchange(particleCountTexture, pos, 0);\n\
+	imageStore(outputTexture, pos, vec4(v / 10.0, 0.0, 0.0, 1.0));\n\
 }";
 
 static string updateParticlesComputeShaderCode = "\
 #version 430\n\
-layout(binding = 0, rgba32f) uniform image2D outputTexture;\n\
-layout(binding = 1, r32i) uniform iimage2D particleCountTexture;\n\
+layout(binding = 1, r32ui) uniform uimage2D particleCountTexture;\n\
+layout(binding = 2, rgba32f) uniform image2D particlePositionTexture;\n\
 layout(local_size_x = 16, local_size_y = 16) in;\n\
 float w = ${width}, h = ${height};\n\
 void main() {\n\
-	ivec2 pos = ivec2(gl_GlobalInvocationID.xy);\n\
-	ivec4 v = imageLoad(particleCountTexture, pos);\n\
-	imageStore(outputTexture, pos, vec4(v.r / (w * h), 0.0, 0.0, 1.0));\n\
+	ivec2 id = ivec2(gl_GlobalInvocationID.xy);\n\
+	vec4 position = imageLoad(particlePositionTexture, id);\n\
+	imageAtomicAdd(particleCountTexture, ivec2(position.x, position.y), 1);\n\
 }";
 
 string formatShaderCode(string shaderCode)
@@ -132,12 +134,41 @@ int main()
 	// that should be positioned on the corresponding pixel on the main texture/screen
 	GLuint particleCountTextureID;
 	{
+		auto sz = config.width * config.height * 4;
+		GLuint *data = new GLuint[sz];
+		for (int i = 0; i < sz; ++i)
+			data[i] = 2;
 		glGenTextures(1, &particleCountTextureID);
 		glBindTexture(GL_TEXTURE_2D, particleCountTextureID);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_R32I, config.width, config.height, 0, GL_RED_INTEGER, GL_INT, nullptr);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, config.width, config.height, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, data);
+		delete[] data;
 		checkForErrors("Generate particle count texture");
+	}
+
+	// Create a texture in which the particle coordinates will be stored
+	GLuint particlePositionTextureID;
+	{
+		int sizeX = config.particleCountX;
+		int sizeY = config.particleCountY;
+
+		auto sz = sizeX * sizeY;
+		float *data = new float[sz * 4];
+		for (int i = 0; i < sz; ++i) {
+			data[i * 4 + 0] = config.width * (rand() / float(RAND_MAX));
+			data[i * 4 + 1] = config.height * (rand() / float(RAND_MAX));
+			data[i * 4 + 2] = 0.0;
+			data[i * 4 + 3] = 0.0;
+		}
+
+		glGenTextures(1, &particlePositionTextureID);
+		glBindTexture(GL_TEXTURE_2D, particlePositionTextureID);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, sizeX, sizeY, 0, GL_RGBA, GL_FLOAT, data);
+		delete[] data;
+		checkForErrors("Generate particle position texture");
 	}
 
 	// Create the render program
@@ -146,7 +177,7 @@ int main()
 	GLuint renderProgramID = linkProgram({vertexID, fragmentID});
 
 	// Create the shader programs
-	GLuint clearTextureProgramID = linkProgram({createShader(formatShaderCode(clearTextureComputeShaderCode), GL_COMPUTE_SHADER, "Clear texture compute shader")});
+	GLuint renderTexureProgramID = linkProgram({createShader(formatShaderCode(renderTextureComputeShaderCode), GL_COMPUTE_SHADER, "Render texture compute shader")});
 	GLuint updateParticlesProgramID = linkProgram({createShader(formatShaderCode(updateParticlesComputeShaderCode), GL_COMPUTE_SHADER, "Update particles compute shader")});
 
 	// Two triangles
@@ -177,20 +208,24 @@ int main()
 
 		glActiveTexture(GL_TEXTURE0);
 		glBindImageTexture(0, textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-		glBindImageTexture(1, particleCountTextureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32I);
-
-		// Clear the output texture
-		glUseProgram(clearTextureProgramID);
-		glUniform1i(glGetUniformLocation(clearTextureProgramID, "particleCountTexture"), 0);
-		glDispatchCompute(config.width / 16, config.height / 16, 1);
-		checkForErrors("Dispatch clear texture compute shader");
+		glActiveTexture(GL_TEXTURE0 + 1);
+		glBindImageTexture(1, particleCountTextureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
+		glActiveTexture(GL_TEXTURE0 + 2);
+		glBindImageTexture(2, particlePositionTextureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
 
 		// Update the particles
 		glUseProgram(updateParticlesProgramID);
-		glUniform1i(glGetUniformLocation(updateParticlesProgramID, "outputTexture"), 0);
-		glUniform1i(glGetUniformLocation(updateParticlesProgramID, "particleCountTexture"), 0);
-		glDispatchCompute(config.width / 16, config.height / 16, 1);
+		glUniform1i(glGetUniformLocation(updateParticlesProgramID, "particleCountTexture"), 1);
+		glUniform1i(glGetUniformLocation(updateParticlesProgramID, "particlePositionTexture"), 2);
+		glDispatchCompute(config.particleCountX / 16, config.particleCountY / 16, 1);
 		checkForErrors("Dispatch update particles compute shader");
+
+		// Render the output texture
+		glUseProgram(renderTexureProgramID);
+		glUniform1i(glGetUniformLocation(updateParticlesProgramID, "outputTexture"), 0);
+		glUniform1i(glGetUniformLocation(renderTexureProgramID, "particleCountTexture"), 1);
+		glDispatchCompute(config.width / 16, config.height / 16, 1);
+		checkForErrors("Dispatch render texture compute shader");
 
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
