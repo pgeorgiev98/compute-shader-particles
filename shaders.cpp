@@ -24,7 +24,7 @@ GLuint createShader(const string &code, GLenum shaderType, const string &shaderN
 		log.resize(logLength);
 		char *logPtr = &log[0];
 		glGetShaderInfoLog(handle, logLength, nullptr, logPtr);
-		cerr << "Failed to compile shader" << shaderName << ": " << log << endl;
+		cerr << "Failed to compile shader \"" << shaderName << "\": " << log << endl;
 		exit(1);
 	}
 

@@ -31,18 +31,42 @@ void main() {\n\
 	color = texture(sampler, uv).rgb;\n\
 }";
 
-// TODO: Remove hardcoded width and height
-static string computeShaderCode = "\
+static string clearTextureComputeShaderCode = "\
+#version 430\n\
+layout(binding = 1, r32i) uniform iimage2D particleCountTexture;\n\
+layout(local_size_x = 16, local_size_y = 16) in;\n\
+float w = ${width}, h = ${height};\n\
+void main() {\n\
+	ivec2 pos = ivec2(gl_GlobalInvocationID.xy);\n\
+	imageStore(particleCountTexture, pos, ivec4(pos.x + pos.y * ${height}, 0, 0, 0));\n\
+}";
+
+static string updateParticlesComputeShaderCode = "\
 #version 430\n\
 layout(binding = 0, rgba32f) uniform image2D outputTexture;\n\
+layout(binding = 1, r32i) uniform iimage2D particleCountTexture;\n\
 layout(local_size_x = 16, local_size_y = 16) in;\n\
+float w = ${width}, h = ${height};\n\
 void main() {\n\
-	ivec2 storePos = ivec2(gl_GlobalInvocationID.xy);\n\
-	float r = storePos.x / 512.0;\n\
-	float g = storePos.y / 512.0;\n\
-	float b = 0.0;\n\
-	imageStore(outputTexture, storePos, vec4(r, g, b, 1.0));\n\
+	ivec2 pos = ivec2(gl_GlobalInvocationID.xy);\n\
+	ivec4 v = imageLoad(particleCountTexture, pos);\n\
+	imageStore(outputTexture, pos, vec4(v.r / (w * h), 0.0, 0.0, 1.0));\n\
 }";
+
+string formatShaderCode(string shaderCode)
+{
+	for (auto p : {pair<string, string>("width", to_string(config.width)),
+				   {"height", to_string(config.height)}}) {
+		string s = "${" + p.first + "}";
+		for (;;) {
+			auto i = shaderCode.find(s);
+			if (i == string::npos)
+				break;
+			shaderCode.replace(i, s.size(), p.second);
+		}
+	}
+	return shaderCode;
+}
 
 
 static void checkForErrors(string where)
@@ -104,13 +128,26 @@ int main()
 		checkForErrors("Generate texture");
 	}
 
+	// Create a integer texture, where every pixel's value is the number of particles
+	// that should be positioned on the corresponding pixel on the main texture/screen
+	GLuint particleCountTextureID;
+	{
+		glGenTextures(1, &particleCountTextureID);
+		glBindTexture(GL_TEXTURE_2D, particleCountTextureID);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_R32I, config.width, config.height, 0, GL_RED_INTEGER, GL_INT, nullptr);
+		checkForErrors("Generate particle count texture");
+	}
+
 	// Create the render program
 	GLuint vertexID = createShader(vertexShaderCode, GL_VERTEX_SHADER, "Vertex shader");
 	GLuint fragmentID = createShader(fragmentShaderCode, GL_FRAGMENT_SHADER, "Fragment shader");
 	GLuint renderProgramID = linkProgram({vertexID, fragmentID});
 
-	// Create the shader program
-	GLuint computeProgramID = linkProgram({createShader(computeShaderCode, GL_COMPUTE_SHADER, "Compute shader")});
+	// Create the shader programs
+	GLuint clearTextureProgramID = linkProgram({createShader(formatShaderCode(clearTextureComputeShaderCode), GL_COMPUTE_SHADER, "Clear texture compute shader")});
+	GLuint updateParticlesProgramID = linkProgram({createShader(formatShaderCode(updateParticlesComputeShaderCode), GL_COMPUTE_SHADER, "Update particles compute shader")});
 
 	// Two triangles
 	GLuint vertArray;
@@ -138,13 +175,22 @@ int main()
 	while (!glfwWindowShouldClose(window)) {
 		glClear(GL_COLOR_BUFFER_BIT);
 
-		glUseProgram(computeProgramID);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, textureID);
 		glBindImageTexture(0, textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-		glUniform1i(glGetUniformLocation(computeProgramID, "outputTexture"), 0);
+		glBindImageTexture(1, particleCountTextureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32I);
+
+		// Clear the output texture
+		glUseProgram(clearTextureProgramID);
+		glUniform1i(glGetUniformLocation(clearTextureProgramID, "particleCountTexture"), 0);
 		glDispatchCompute(config.width / 16, config.height / 16, 1);
-		checkForErrors("Compute");
+		checkForErrors("Dispatch clear texture compute shader");
+
+		// Update the particles
+		glUseProgram(updateParticlesProgramID);
+		glUniform1i(glGetUniformLocation(updateParticlesProgramID, "outputTexture"), 0);
+		glUniform1i(glGetUniformLocation(updateParticlesProgramID, "particleCountTexture"), 0);
+		glDispatchCompute(config.width / 16, config.height / 16, 1);
+		checkForErrors("Dispatch update particles compute shader");
 
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
