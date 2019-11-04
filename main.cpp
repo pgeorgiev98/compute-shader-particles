@@ -2,6 +2,9 @@
 #include "shaders.h"
 
 #include <iostream>
+#include <iomanip>
+#include <map>
+#include <variant>
 using namespace std;
 
 #include <GL/glew.h>
@@ -83,29 +86,58 @@ void main() {\n\
 
 string formatShaderCode(string shaderCode)
 {
-	for (auto p : {pair<string, string>("width", to_string(config.width)),
-				   {"height", to_string(config.height)},
-				   {"colorRedMul", to_string(config.colorRedMul)},
-				   {"colorRedAdd", to_string(config.colorRedAdd)},
-				   {"colorGreenMul", to_string(config.colorGreenMul)},
-				   {"colorGreenAdd", to_string(config.colorGreenAdd)},
-				   {"colorBlueMul", to_string(config.colorBlueMul)},
-				   {"colorBlueAdd", to_string(config.colorBlueAdd)},
-				   {"minimumDistance", to_string(config.minimumDistance)}}) {
-		string s = "${" + p.first + "}";
+	for (auto v : config.values) {
+		string name = v.first;
+		string s = "${" + name + "}";
 		for (;;) {
 			auto i = shaderCode.find(s);
 			if (i == string::npos)
 				break;
-			shaderCode.replace(i, s.size(), p.second);
+			shaderCode.replace(i, s.size(), config.getValue(name));
 		}
 	}
 	return shaderCode;
 }
 
 
-int main()
+static void printHelp(const char *arg0)
 {
+	cout << "Usage: " << arg0 << " [OPTIONS]" << endl << endl
+		 << "OPTIONS:" << endl
+		 << "\thelp, --help, -h    Display this message" << endl
+		 << "\tprintConfig         Print all configurable values" << endl
+		 << "\tset name value      Set the value of {name} to {value}" << endl;
+}
+
+static void printConfig()
+{
+	for (auto v : config.values) {
+		string s = v.first;
+		cout << setw(20) << s << " " << config.getValue(s) << endl;
+	}
+}
+
+int main(int argc, char **argv)
+{
+	for (int i = 1; i < argc; ++i) {
+		string a = argv[i];
+		if (a == "help" || a == "--help" || a == "-h") {
+			printHelp(argv[0]);
+			return 0;
+		} else if (a == "printConfig") {
+			printConfig();
+			return 0;
+		} else if (a == "set") {
+			if (i + 2 >= argc)
+				throw "Expected 2 arguments to 'set'";
+			config.setValue(argv[i + 1], argv[i + 2]);
+			i += 2;
+		} else {
+			cerr << "Unknown argument: " << a << endl;
+			return 1;
+		}
+	}
+
 	// Initialize GLFW
 	if (!glfwInit()) {
 		cerr << "Failed to initialize GLFW" << endl;
