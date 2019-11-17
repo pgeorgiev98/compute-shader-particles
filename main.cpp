@@ -43,6 +43,7 @@ float w = ${width}, h = ${height};\n\
 void main() {\n\
 	ivec2 pos = ivec2(gl_GlobalInvocationID.xy);\n\
 	float v = imageAtomicExchange(particleCountTexture, pos, 0);\n\
+	v /= ${maxParticlesOnPixel};\n\
 	imageStore(outputTexture, pos, vec4(v * ${colorRedMul} + ${colorRedAdd}, v * ${colorGreenMul} + ${colorGreenAdd}, v * ${colorBlueMul} + ${colorBlueAdd}, 1.0));\n\
 }";
 

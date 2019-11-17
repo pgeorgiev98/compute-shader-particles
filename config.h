@@ -17,11 +17,12 @@ struct Config
 
 	float forceMultiplier = 10.0;
 
-	float colorRedMul = 0.1;
-	float colorRedAdd = -1.0;
-	float colorGreenMul = 0.1;
+	int maxParticlesOnPixel = 15;
+	float colorRedMul = 1.0;
+	float colorRedAdd = 0.0;
+	float colorGreenMul = 1.0;
 	float colorGreenAdd = 0.0;
-	float colorBlueMul = 0.1;
+	float colorBlueMul = 1.0;
 	float colorBlueAdd = -1.0;
 
 	float massMin = 0.75;
@@ -37,6 +38,7 @@ struct Config
 		{"particleCountX", &particleCountX},
 		{"particleCountY", &particleCountY},
 		{"forceMultiplier", &forceMultiplier},
+		{"maxParticlesOnPixel", &maxParticlesOnPixel},
 		{"colorRedMul", &colorRedMul},
 		{"colorRedAdd", &colorRedAdd},
 		{"colorGreenMul", &colorGreenMul},
