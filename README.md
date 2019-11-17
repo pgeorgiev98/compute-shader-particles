@@ -4,6 +4,14 @@ This is a very basic simulation of a *lot* of particles in a 2D space.
 You click left to attract them to your cursor and right to repel them from your cursor.
 The compute shaders allow this to run in real-time with a lot more particles than if the physics were calculated on the CPU.
 
+# Demos
+
+![](samples/capture-1.gif)
+![](samples/capture-2.gif)
+![](samples/capture-3.gif)
+![](samples/capture-4.gif)
+![](samples/capture-5.gif)
+
 # Dependencies
 
 You'll need `glfw3`, `glew` and `glu` to be able to build the project.
