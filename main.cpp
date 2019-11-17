@@ -53,23 +53,38 @@ layout(binding = 1, r32ui) uniform coherent uimage2D particleCountTexture;\n\
 layout(binding = 2, rgba32f) uniform image2D particlePositionTexture;\n\
 layout(binding = 3, r32f) uniform image2D particleMassTexture;\n\
 layout(local_size_x = 16, local_size_y = 16) in;\n\
-uniform float forceMultiplier;\
-uniform vec2 cursorPos;\
+uniform float forceMultiplier;\n\
+uniform vec2 cursorPos;\n\
+uniform float timeSinceLastFrame;\n\
 float w = ${width}, h = ${height};\n\
 void main() {\n\
 	ivec2 id = ivec2(gl_GlobalInvocationID.xy);\n\
 	vec4 v = imageLoad(particlePositionTexture, id);\n\
 	float mass = imageLoad(particleMassTexture, id).r;\n\
 	\
+	v.x -= v.z * timeSinceLastFrame;\n\
+	v.y -= v.w * timeSinceLastFrame;\n\
+	\
 	float dx = v.x - cursorPos.x;\n\
 	float dy = v.y - cursorPos.y;\n\
 	float dist = dx * dx + dy * dy;\n\
 	if (dist < ${minimumDistance}) dist = ${minimumDistance};\n\
-	float c = forceMultiplier / mass;\n\
+	float c = timeSinceLastFrame * forceMultiplier / mass;\n\
 	v.z += c * dx / dist;\n\
 	v.w += c * dy / dist;\n\
-	v.x -= v.z;\n\
-	v.y -= v.w;\n\
+	\
+	uint p = imageAtomicAdd(particleCountTexture, ivec2(v.x, v.y), 1);\n\
+	\
+	float drag1 = ${drag1};\n\
+	float drag2 = ${drag2} * (v.z*v.z + v.w*v.w);\n\
+	float drag3 = ${drag3} * p;\n\
+	float drag = timeSinceLastFrame * (drag1 + drag2 + drag3);\n\
+	if (v.z > drag) v.z -= drag;\n\
+	else if (v.z < -drag) v.z += drag;\n\
+	else v.z = 0.0;\n\
+	if (v.w > drag) v.w -= drag;\n\
+	else if (v.w < -drag) v.w += drag;\n\
+	else v.w = 0.0;\n\
 	\
 	//if (v.x < 0.0) { v.x = 0.0; v.z = 0.0; }\n\
 	//if (v.x > ${width}) { v.x = ${width}; v.z = 0.0; }\n\
@@ -82,7 +97,6 @@ void main() {\n\
 	if (v.y > ${height}) { v.y = ${height}; v.w *= -0.5; v.z *= 0.5; }\n\
 	\
 	imageStore(particlePositionTexture, id, v);\n\
-	imageAtomicAdd(particleCountTexture, ivec2(v.x, v.y), 1);\n\
 }";
 
 string formatShaderCode(string shaderCode)
@@ -282,7 +296,13 @@ int main(int argc, char **argv)
 
 	glfwSwapInterval(config.enableVSync);
 	glfwSetTime(0.0);
+	double lastFrameTime = 0.0;
+	double fpsCountLastTime = 0.0;
 	while (!glfwWindowShouldClose(window)) {
+		double currentTime = glfwGetTime();
+		double timeSinceLastFrame = currentTime - lastFrameTime;
+		lastFrameTime += timeSinceLastFrame;
+
 		glClear(GL_COLOR_BUFFER_BIT);
 
 		double xpos, ypos;
@@ -311,6 +331,7 @@ int main(int argc, char **argv)
 		glUniform1i(glGetUniformLocation(updateParticlesProgramID, "particlePositionTexture"), 2);
 		glUniform1i(glGetUniformLocation(updateParticlesProgramID, "particleMassTexture"), 3);
 		glUniform2f(glGetUniformLocation(updateParticlesProgramID, "cursorPos"), xpos, ypos);
+		glUniform1f(glGetUniformLocation(updateParticlesProgramID, "timeSinceLastFrame"), timeSinceLastFrame);
 		glUniform1f(glGetUniformLocation(updateParticlesProgramID, "forceMultiplier"), forceMultiplier);
 		glDispatchCompute(config.particleCountX / 16, config.particleCountY / 16, 1);
 
@@ -334,11 +355,11 @@ int main(int argc, char **argv)
 		glfwPollEvents();
 
 		++frames;
-		double time = glfwGetTime();
-		if (time >= 1.0) {
-			glfwSetTime(0.0);
-			cerr << "FPS: " << frames / time << endl;
+		double timeSinceLastFpsCount = currentTime - fpsCountLastTime;
+		if (timeSinceLastFpsCount >= 1.0) {
+			cerr << "FPS: " << frames / timeSinceLastFpsCount << endl;
 			frames = 0;
+			fpsCountLastTime = currentTime;
 		}
 	}
 

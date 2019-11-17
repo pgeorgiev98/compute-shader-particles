@@ -15,7 +15,7 @@ struct Config
 	int particleCountX = 1024;
 	int particleCountY = 1024;
 
-	float forceMultiplier = 10.0;
+	float forceMultiplier = 30000.0;
 
 	int maxParticlesOnPixel = 15;
 	float colorRedMul = 1.0;
@@ -28,7 +28,11 @@ struct Config
 	float massMin = 0.75;
 	float massMax = 1.25;
 
-	float minimumDistance = 50.0;
+	float drag1 = 0.0;
+	float drag2 = 0.0;
+	float drag3 = 0.0;
+
+	float minimumDistance = 10.0;
 
 	typedef std::variant<bool *, int *, float *> V;
 	std::vector<std::pair<std::string, V>> values = {
@@ -47,6 +51,9 @@ struct Config
 		{"colorBlueAdd", &colorBlueAdd},
 		{"massMin", &massMin},
 		{"massMax", &massMax},
+		{"drag1", &drag1},
+		{"drag2", &drag2},
+		{"drag3", &drag3},
 		{"minimumDistance", &minimumDistance},
 	};
 
