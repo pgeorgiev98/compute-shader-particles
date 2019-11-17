@@ -111,9 +111,14 @@ static void printHelp(const char *arg0)
 
 static void printConfig()
 {
+	int maxWidth = 0;
+	for (auto v : config.values)
+		if (v.first.size() > maxWidth)
+			maxWidth = v.first.size();
+
 	for (auto v : config.values) {
 		string s = v.first;
-		cout << setw(20) << s << " " << config.getValue(s) << endl;
+		cout << setw(maxWidth) << s << " " << config.getValue(s) << endl;
 	}
 }
 
