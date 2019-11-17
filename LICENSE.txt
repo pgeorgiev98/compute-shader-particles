@@ -1,0 +1,14 @@
+DO-WHAT-THE-FUCK-YOU-WANT-TO Public License
+
+Everyone is permitted to copy and distribute verbatim or modified
+copies of this license document, and changing it is allowed as long
+as the name is changed.
+
+The DO-WHAT-THE-FUCK-YOU-WANT-TO Public License terms and conditions for copying, distribution and modification:
+
+- This license document permits you to DO WHAT THE FUCK YOU WANT TO.
+
+This program is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of
+USEFULNESS or FITNESS FOR A PARTICULAR PURPOSE.
+
