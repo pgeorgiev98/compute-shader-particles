@@ -12,6 +12,9 @@ struct Config
 {
 	int width = 768, height = 768;
 	bool enableVSync = true;
+
+	// number of particles = countX * countY
+	// Both must be multiples of 16
 	int particleCountX = 1024;
 	int particleCountY = 1024;
 
@@ -34,6 +37,14 @@ struct Config
 
 	float minimumDistance = 10.0;
 
+	enum {
+		WALL_COLLISION_NONE = 0,
+		WALL_COLLISION_STOP = 1,
+		WALL_COLLISION_REFLECT = 2,
+	};
+	int wallCollisionAction = WALL_COLLISION_REFLECT;
+	float collisionReflectSpeed = 0.5;
+
 	typedef std::variant<bool *, int *, float *> V;
 	std::vector<std::pair<std::string, V>> values = {
 		{"width", &width},
@@ -55,6 +66,8 @@ struct Config
 		{"drag2", &drag2},
 		{"drag3", &drag3},
 		{"minimumDistance", &minimumDistance},
+		{"wallCollisionAction", &wallCollisionAction},
+		{"collisionReflectSpeed", &collisionReflectSpeed},
 	};
 
 	V find(std::string name) const

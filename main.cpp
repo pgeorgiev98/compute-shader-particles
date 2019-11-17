@@ -86,15 +86,18 @@ void main() {\n\
 	else if (v.w < -drag) v.w += drag;\n\
 	else v.w = 0.0;\n\
 	\
-	//if (v.x < 0.0) { v.x = 0.0; v.z = 0.0; }\n\
-	//if (v.x > ${width}) { v.x = ${width}; v.z = 0.0; }\n\
-	//if (v.y < 0.0) { v.y = 0.0; v.w = 0.0; }\n\
-	//if (v.y > ${height}) { v.y = ${height}; v.w = 0.0; }\n\
-	\
-	if (v.x < 0.0) { v.x = 0.0; v.z *= -0.5; v.w *= 0.5; }\n\
-	if (v.x > ${width}) { v.x = ${width}; v.z *= -0.5; v.w *= 0.5; }\n\
-	if (v.y < 0.0) { v.y = 0.0; v.w *= -0.5; v.z *= 0.5; }\n\
-	if (v.y > ${height}) { v.y = ${height}; v.w *= -0.5; v.z *= 0.5; }\n\
+#if ${wallCollisionAction} == 1\n\
+	if (v.x < 0.0) { v.x = 0.0; v.z = 0.0; }\n\
+	if (v.x > ${width}) { v.x = ${width}; v.z = 0.0; }\n\
+	if (v.y < 0.0) { v.y = 0.0; v.w = 0.0; }\n\
+	if (v.y > ${height}) { v.y = ${height}; v.w = 0.0; }\n\
+#elif ${wallCollisionAction} == 2\n\
+	float s = ${collisionReflectSpeed};\n\
+	if (v.x < 0.0) { v.x = 0.0; v.z *= -s; v.w *= s; }\n\
+	if (v.x > ${width}) { v.x = ${width}; v.z *= -s; v.w *= s; }\n\
+	if (v.y < 0.0) { v.y = 0.0; v.w *= -s; v.z *= s; }\n\
+	if (v.y > ${height}) { v.y = ${height}; v.w *= -s; v.z *= s; }\n\
+#endif\n\
 	\
 	imageStore(particlePositionTexture, id, v);\n\
 }";
