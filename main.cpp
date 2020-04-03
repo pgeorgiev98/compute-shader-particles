@@ -77,7 +77,7 @@ void main() {\n\
 	\
 	float drag1 = ${drag1};\n\
 	float drag2 = ${drag2} * (v.z*v.z + v.w*v.w);\n\
-	float drag3 = ${drag3} * p;\n\
+	float drag3 = ${drag3} * float(p);\n\
 	float drag = timeSinceLastFrame * (drag1 + drag2 + drag3);\n\
 	if (v.z > drag) v.z -= drag;\n\
 	else if (v.z < -drag) v.z += drag;\n\
