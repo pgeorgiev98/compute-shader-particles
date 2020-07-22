@@ -6,8 +6,9 @@
 
 #include <string>
 #include <vector>
+#include "config.h"
 
-GLuint createShader(const std::string &code, GLenum shaderType, const std::string &shaderName = "");
+GLuint createShader(const std::string &fileName, GLenum shaderType, Config& config, const std::string &shaderName = "");
 GLuint linkProgram(const std::vector<GLuint> &shaders);
 
 #endif

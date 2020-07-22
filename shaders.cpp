@@ -1,15 +1,40 @@
 #include "shaders.h"
+#include "config.h"
 
 #include <GL/glew.h>
 #include <GL/gl.h>
 
 #include <iostream>
 #include <stdlib.h>
+#include <string>
+#include <fstream>
+#include <streambuf>
 
 using namespace std;
 
-GLuint createShader(const string &code, GLenum shaderType, const string &shaderName)
+static string formatShaderCode(Config& config, string shaderCode) {
+    for (auto v : config.values) {
+        string name = v.first;
+        string s = "${" + name + "}";
+        for (;;) {
+            auto i = shaderCode.find(s);
+            if (i == string::npos)
+                break;
+            shaderCode.replace(i, s.size(), config.getValue(name));
+        }
+    }
+    return shaderCode;
+}
+
+
+GLuint createShader(const string &fileName, GLenum shaderType, Config& config, const string &shaderName)
 {
+    std::ifstream shaderFile(fileName);
+    std::string code((std::istreambuf_iterator<char>(shaderFile)),
+                     std::istreambuf_iterator<char>());
+
+    code = formatShaderCode(config, code);
+
 	GLuint handle = glCreateShader(shaderType);
 	const char *codePtr = code.c_str();
 	glShaderSource(handle, 1, &codePtr, nullptr);

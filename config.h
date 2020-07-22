@@ -10,32 +10,32 @@
 
 struct Config
 {
-	int width = 768, height = 768;
+	int width = 800, height = 600;
 	bool enableVSync = true;
 
 	// number of particles = countX * countY
 	// Both must be multiples of 16
-	int particleCountX = 1024;
-	int particleCountY = 1024;
+	int particleCountX = 100*16;
+	int particleCountY = 100*16;
 
-	float forceMultiplier = 30000.0;
+	float forceMultiplier = 50.0;
 
-	int maxParticlesOnPixel = 15;
+	int maxParticlesOnPixel = 20;
 	float colorRedMul = 1.0;
 	float colorRedAdd = 0.0;
 	float colorGreenMul = 1.0;
 	float colorGreenAdd = 0.0;
 	float colorBlueMul = 1.0;
-	float colorBlueAdd = -1.0;
+	float colorBlueAdd = 0.0;
 
 	float massMin = 0.75;
-	float massMax = 1.25;
+	float massMax = 1.15;
 
 	float drag1 = 0.0;
 	float drag2 = 0.0;
 	float drag3 = 0.0;
 
-	float minimumDistance = 10.0;
+	float minimumDistance = 20.0;
 
 	enum {
 		WALL_COLLISION_NONE = 0,
