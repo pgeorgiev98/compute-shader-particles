@@ -1,5 +1,0 @@
-"C:\Program Files\JetBrains\CLion 2019.3.4\bin\cmake\win\bin\cmake.exe" -DCMAKE_BUILD_TYPE=Debug -DBUILD_GLFW=ON -DGLFW_PATH=D:\Programming\Projects\Dependencies\glfw -DGLEW_BINARY_PATH=D:\Programming\Projects\Dependencies\glew-2.1.0 -G "CodeBlocks - NMake Makefiles" D:\Programming\Projects\compute-shader-particles
--- Using Win32 for window creation
--- Configuring done
--- Generating done
--- Build files have been written to: D:/Programming/Projects/compute-shader-particles/cmake-build-debug

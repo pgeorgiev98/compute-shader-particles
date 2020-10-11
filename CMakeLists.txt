@@ -25,6 +25,7 @@ endif()
 
 find_package(OpenGL REQUIRED)
 
+cmake_policy(SET CMP0074 NEW)
 set(GLEW_USE_STATIC_LIBS 1)
 find_package(GLEW REQUIRED)
 
