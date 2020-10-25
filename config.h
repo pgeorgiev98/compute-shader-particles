@@ -10,7 +10,7 @@
 
 struct Config
 {
-	int width = 800, height = 600;
+	int width = 1000, height = 600;
 	bool enableVSync = true;
 
 	// number of particles = countX * countY
@@ -20,7 +20,7 @@ struct Config
 
 	float forceMultiplier = 50.0;
 
-	int maxParticlesOnPixel = 20;
+	int maxParticlesOnPixel = 5;
 	float colorRedMul = 1.0;
 	float colorRedAdd = 0.0;
 	float colorGreenMul = 1.0;

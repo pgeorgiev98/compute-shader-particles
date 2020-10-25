@@ -26,10 +26,12 @@ struct Textures {
     GLuint particlePositionTextureID;
     GLuint particleDestinationTextureID;
     GLuint particleMassTextureID;
-    GLuint imageTextureID;
     GLuint colorTextureRID;
     GLuint colorTextureGID;
     GLuint colorTextureBID;
+    GLuint imageTextureID;
+    int imageWidth;
+    int imageHeight;
 };
 
 static void printHelp(const char *arg0);
@@ -98,8 +100,8 @@ void draw(const Textures &textures, GLuint renderProgramID, GLuint renderTexureP
         glBindImageTexture(1, textures.particleCountTextureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
         glActiveTexture(GL_TEXTURE0 + 2);
         glBindImageTexture(2, textures.particlePositionTextureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-        glActiveTexture(GL_TEXTURE0 + 3);
-        glBindImageTexture(3, textures.particleMassTextureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+//        glActiveTexture(GL_TEXTURE0 + 3);
+//        glBindImageTexture(3, textures.particleMassTextureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
         glActiveTexture(GL_TEXTURE0 + 4);
         glBindImageTexture(4, textures.particleDestinationTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
         glActiveTexture(GL_TEXTURE0 + 5);
@@ -108,22 +110,23 @@ void draw(const Textures &textures, GLuint renderProgramID, GLuint renderTexureP
         glBindImageTexture(6, textures.colorTextureGID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
         glActiveTexture(GL_TEXTURE0 + 7);
         glBindImageTexture(7, textures.colorTextureBID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
-        glActiveTexture(GL_TEXTURE0 + 8);
-        glBindImageTexture(8, textures.imageTextureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+        glActiveTexture(GL_TEXTURE0 + 3);
+        glBindImageTexture(3, textures.imageTextureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
 
         // Update the particles
         glUseProgram(updateParticlesProgramID);
         glUniform1i(glGetUniformLocation(updateParticlesProgramID, "particleCountTexture"), 1);
         glUniform1i(glGetUniformLocation(updateParticlesProgramID, "particlePositionTexture"), 2);
-        glUniform1i(glGetUniformLocation(updateParticlesProgramID, "particleMassTexture"), 3);
+//        glUniform1i(glGetUniformLocation(updateParticlesProgramID, "particleMassTexture"), 3);
         glUniform1i(glGetUniformLocation(updateParticlesProgramID, "particleDestinationTexture"), 4);
         glUniform1i(glGetUniformLocation(updateParticlesProgramID, "colorTextureR"), 5);
         glUniform1i(glGetUniformLocation(updateParticlesProgramID, "colorTextureG"), 6);
         glUniform1i(glGetUniformLocation(updateParticlesProgramID, "colorTextureB"), 7);
-        glUniform1i(glGetUniformLocation(updateParticlesProgramID, "imageTexture"), 8);
+        glUniform1i(glGetUniformLocation(updateParticlesProgramID, "imageTexture"), 3);
         glUniform2f(glGetUniformLocation(updateParticlesProgramID, "cursorPos"), xpos, ypos);
         glUniform1f(glGetUniformLocation(updateParticlesProgramID, "timeSinceLastFrame"), timeSinceLastFrame);
         glUniform1f(glGetUniformLocation(updateParticlesProgramID, "forceMultiplier"), forceMultiplier);
+        glUniform2f(glGetUniformLocation(updateParticlesProgramID, "imageSize"), textures.imageWidth, textures.imageHeight);
         glDispatchCompute(config.particleCountX / 16, config.particleCountY / 16, 1);
 
         // Render the output texture
@@ -309,15 +312,24 @@ void initializeTextures(Textures &textures) {
     }
 
     {
-        const char* imagePath = "images/icaka.jpg";
-        int width, height, nrChannels;
-        unsigned char *data = stbi_load(imagePath, &width, &height, &nrChannels, 0);
+        const char* imagePath = "images/icaka.png";
+        int nrChannels;
+        unsigned char *data = stbi_load(imagePath, &textures.imageWidth, &textures.imageHeight, &nrChannels, 0);
+        int sz = textures.imageWidth*textures.imageHeight*4;
+        float *fdata = new float[sz];
+        for (int i = 0; i < sz; ++i) {
+            fdata[i] = data[i];
+        }
+
         if (!data) {
             cerr << "Failed loading image: " << imagePath << endl;
         }
+
         glGenTextures(1, &textures.imageTextureID);
         glBindTexture(GL_TEXTURE_2D, textures.imageTextureID);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, textures.imageWidth, textures.imageHeight, 0, GL_RGBA, GL_FLOAT, fdata);
         stbi_image_free(data);
     }
 }

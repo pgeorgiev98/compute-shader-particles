@@ -14,6 +14,11 @@ void main() {
     float b = imageAtomicExchange(colorTextureB, pos, 0);
     vec3 color = vec3(r,g,b);
 
+//    if (v > 0) {
+//        imageStore(outputTexture, pos, vec4(1,0,0,1.0));
+//        return;
+//    }
+
     color /= v;
     color /= 255;
     imageStore(outputTexture, pos, vec4(color, 1.0));
