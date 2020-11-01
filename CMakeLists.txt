@@ -2,7 +2,11 @@ cmake_minimum_required(VERSION 3.11)
 
 project(particles)
 
-set(SOURCES main.cpp shaders.cpp)
+set(SOURCES
+        main.cpp
+        shaders.cpp
+        initializers/BaseInitializer.cpp
+)
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
