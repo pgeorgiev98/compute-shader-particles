@@ -12,6 +12,7 @@ uniform vec2 imageSize;
 uniform float forceMultiplier;
 uniform vec2 cursorPos;
 uniform float timeSinceLastFrame;
+uniform bool mousePressed;
 float w = ${width}, h = ${height};
 
 void main() {
@@ -21,27 +22,40 @@ void main() {
 //    float mass = imageLoad(particleMassTexture, id).r;
     float mass = 1;
 
-    v.x -= v.z * timeSinceLastFrame;
-    v.y -= v.w * timeSinceLastFrame;
-
-    float dx = v.x - d.x;
-    float dy = v.y - d.y;
-    float dist = dx * dx + dy * dy;
     vec4 destinationColor = imageLoad(imageTexture, ivec2(d.x * imageSize.x/${width}, (${height} - d.y) * imageSize.y/${height}));
+    if (mousePressed) {
+        vec2 distVec = v.xy - cursorPos;
+        float cursorDist = sqrt(dot(distVec, distVec));
+        if (cursorDist < 80) {
+            vec2 normDistVec = normalize(distVec);
+            v.xy = clamp(cursorPos + normDistVec * 80, vec2(0,0), vec2(w, h));
+//            v.zw -= normDistVec * 50;
+        }
+    }
+
+    vec2 diff = v.xy - d.xy;
+    float dist = dot(diff, diff);
+
+    v.xy -= v.zw * timeSinceLastFrame;
+
+//    if (dist < ${minimumDistance} && !mousePressed){
     if (dist < ${minimumDistance}){
         dist = 0.0;
-        v.x=d.x;
-        v.y=d.y;
-        v.z=0.0;
-        v.w=0.0;
+        v.xy = d.xy;
+        v.zw=vec2(0,0);
         uint p = imageAtomicAdd(particleCountTexture, ivec2(v.x, v.y), 1);
-        imageAtomicAdd(colorTextureR, ivec2(v.x, v.y), int(destinationColor.r));
-        imageAtomicAdd(colorTextureG, ivec2(v.x, v.y), int(destinationColor.g));
-        imageAtomicAdd(colorTextureB, ivec2(v.x, v.y), int(destinationColor.b));
+        imageAtomicAdd(colorTextureR, ivec2(v.xy), int(destinationColor.r));
+        imageAtomicAdd(colorTextureG, ivec2(v.xy), int(destinationColor.g));
+        imageAtomicAdd(colorTextureB, ivec2(v.xy), int(destinationColor.b));
     }else{
-        float c = timeSinceLastFrame * 10000 * (forceMultiplier+1)/ mass;
-        v.z += c * dx / dist;
-        v.w += c * dy / dist;
+        float c;
+
+        c = timeSinceLastFrame / mass;
+//        v.z += c * dx;// * (dist/(w*w+h*h));
+//        v.w += c * dy;// * (dist/(w*w+h*h));
+//        if (!mousePressed) {
+            v.zw = v.zw * 0.2 + c * diff * 0.8 * 500;
+//        }
 
         uint p = imageAtomicAdd(particleCountTexture, ivec2(v.x, v.y), 1);
         imageAtomicAdd(colorTextureR, ivec2(v.x, v.y), int(destinationColor.r));

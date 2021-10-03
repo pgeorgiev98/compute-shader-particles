@@ -10,15 +10,18 @@
 
 struct Config
 {
-	int width = 1000, height = 600;
 	bool enableVSync = true;
 
 	// number of particles = countX * countY
 	// Both must be multiples of 16
-	int particleCountX = 100*16;
-	int particleCountY = 100*16;
+	int particleCountX = 16*16*7;
+	int particleCountY = 10*16*7;
+
+    int width = particleCountX, height = particleCountY;
 
 	float forceMultiplier = 50.0;
+
+    float maxSpeed = 350.0;
 
 	int maxParticlesOnPixel = 5;
 	float colorRedMul = 1.0;
@@ -35,7 +38,7 @@ struct Config
 	float drag2 = 0.0;
 	float drag3 = 0.0;
 
-	float minimumDistance = 20.0;
+	float minimumDistance = 5.0;
 
 	enum {
 		WALL_COLLISION_NONE = 0,
@@ -68,6 +71,7 @@ struct Config
 		{"minimumDistance", &minimumDistance},
 		{"wallCollisionAction", &wallCollisionAction},
 		{"collisionReflectSpeed", &collisionReflectSpeed},
+        {"maxSpeed", &maxSpeed},
 	};
 
 	V find(std::string name) const

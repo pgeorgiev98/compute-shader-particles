@@ -15,12 +15,14 @@ using namespace std;
 #include <GLFW/glfw3.h>
 #include <GL/gl.h>
 
-#include "Initializers/BaseInitializer.hpp"
+#include "initializers/BaseInitializer.hpp"
 
 static GLFWwindow *window = nullptr;
 static int frames = 0;
 
 static Config config;
+static BaseInitializer* initializer;
+static Textures textures;
 
 
 static void printHelp(const char *arg0);
@@ -29,6 +31,7 @@ static void handleArguments(int argc, char **argv);
 static void initializeGLFW();
 void initializeTextures(Textures& textures);
 void generateViewPane(GLuint renderProgramID);
+void drop_callback(GLFWwindow* window, int count, const char** paths);
 
 void draw(const Textures &textures, GLuint renderProgramID, GLuint renderTexureProgramID, GLuint updateParticlesProgramID);
 
@@ -37,8 +40,8 @@ int main(int argc, char **argv)
     handleArguments(argc, argv);
     initializeGLFW();
 
-    BaseInitializer* initializer = new BaseInitializer();
-    Textures textures = initializer->initializeTextures(config);
+    initializer = new BaseInitializer();
+    textures = initializer->initializeTextures(config);
 
 
 	// Create the render program
@@ -52,10 +55,19 @@ int main(int argc, char **argv)
 
     generateViewPane(renderProgramID);
 
+    glfwSetDropCallback(window, drop_callback);
+
     // Drawing
     draw(textures, renderProgramID, renderTexureProgramID, updateParticlesProgramID);
 
     return 0;
+}
+
+void drop_callback(GLFWwindow* window, int count, const char** paths)
+{
+    int i;
+    for (i = 0;  i < count;  i++)
+        initializer->loadImage(paths[i], textures);
 }
 
 void draw(const Textures &textures, GLuint renderProgramID, GLuint renderTexureProgramID, GLuint updateParticlesProgramID) {
@@ -77,10 +89,13 @@ void draw(const Textures &textures, GLuint renderProgramID, GLuint renderTexureP
         ypos = config.height - ypos;
 
         float forceMultiplier = 0.0;
+        bool mousePressed = false;
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)
             forceMultiplier = -1.0;
-        else if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
+        else if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
             forceMultiplier = 1.0;
+            mousePressed = true;
+        }
         forceMultiplier *= config.forceMultiplier;
 
         glActiveTexture(GL_TEXTURE0);
@@ -113,6 +128,7 @@ void draw(const Textures &textures, GLuint renderProgramID, GLuint renderTexureP
         glUniform1i(glGetUniformLocation(updateParticlesProgramID, "colorTextureB"), 7);
         glUniform1i(glGetUniformLocation(updateParticlesProgramID, "imageTexture"), 3);
         glUniform2f(glGetUniformLocation(updateParticlesProgramID, "cursorPos"), xpos, ypos);
+        glUniform1i(glGetUniformLocation(updateParticlesProgramID, "mousePressed"), mousePressed);
         glUniform1f(glGetUniformLocation(updateParticlesProgramID, "timeSinceLastFrame"), timeSinceLastFrame);
         glUniform1f(glGetUniformLocation(updateParticlesProgramID, "forceMultiplier"), forceMultiplier);
         glUniform2f(glGetUniformLocation(updateParticlesProgramID, "imageSize"), textures.imageWidth, textures.imageHeight);

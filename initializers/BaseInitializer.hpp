@@ -21,6 +21,7 @@ struct Textures {
 class BaseInitializer {
 public:
     Textures initializeTextures(const Config &config) const;
+    void loadImage(const char *imagePath, Textures &textures) const;
 
 protected:
 
@@ -31,7 +32,7 @@ protected:
     virtual GLuint generateParticleMassesTexture(const Config &config) const;
 
     void getnerateOutputColorTextures(const Config &config, Textures &textures) const;
-    void loadImage(const char *imagePath, Textures &textures) const;
+//    void loadImage(const char *imagePath, Textures &textures) const;
 };
 
 

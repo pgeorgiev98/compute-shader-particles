@@ -22,7 +22,8 @@ Textures BaseInitializer::initializeTextures(const Config &config) const {
     // Create textures in which the output color will be stored
     getnerateOutputColorTextures(config, textures);
 
-    const char* imagePath = "images/icaka.png";
+    const char* imagePath = "images/Falcons.png";
+
     loadImage(imagePath, textures);
 
     return textures;
@@ -30,7 +31,8 @@ Textures BaseInitializer::initializeTextures(const Config &config) const {
 
 void BaseInitializer::loadImage(const char *imagePath, Textures &textures) const {
     int nrChannels;
-    unsigned char *data = stbi_load(imagePath, &textures.imageWidth, &textures.imageHeight, &nrChannels, 0);
+    unsigned char *data = stbi_load(imagePath, &textures.imageWidth, &textures.imageHeight, &nrChannels, 4);
+    std::cout << "Number of channels: " << nrChannels << std::endl;
     int sz = textures.imageWidth*textures.imageHeight*4;
     float *fdata = new float[sz];
     for (int i = 0; i < sz; ++i) {
@@ -101,13 +103,17 @@ GLuint BaseInitializer::generateParticleDestinationsTexture(const Config &config
 
     auto sz = sizeX * sizeY;
     float *data = new float[sz * 4];
-    for (int i = 0; i < sz; ++i) {
-        float positionX = (rand() / float(RAND_MAX)) * config.width;
-        float positionY = (rand() / float(RAND_MAX)) * config.height;
-        data[i * 4 + 0] = positionX;
-        data[i * 4 + 1] = positionY;
-        data[i * 4 + 2] = 0.0;
-        data[i * 4 + 3] = 0.0;
+//    for (int i = 0; i < sz; ++i) {
+//        float positionX = (rand() / float(RAND_MAX)) * config.width;
+//        float positionY = (rand() / float(RAND_MAX)) * config.height;
+    for(int y= 0; y < config.particleCountY; y++) {
+        for(int x= 0; x < config.particleCountX; x++){
+            int i = y*config.particleCountX + x;
+            data[i * 4 + 0] = x;
+            data[i * 4 + 1] = y;
+            data[i * 4 + 2] = 0.0;
+            data[i * 4 + 3] = 0.0;
+        }
     }
 
     glGenTextures(1, &particleDestinationTexture);
@@ -126,11 +132,16 @@ GLuint BaseInitializer::generateParticlePositionTexture(const Config &config) co
 
     auto sz = sizeX * sizeY;
     float *data = new float[sz * 4];
-    for (int i = 0; i < sz; ++i) {
-        data[i * 4 + 0] = config.width * (rand() / float(RAND_MAX));
-        data[i * 4 + 1] = config.height * (rand() / float(RAND_MAX));
-        data[i * 4 + 2] = 0.0;
-        data[i * 4 + 3] = 0.0;
+    for(int y= 0; y < config.particleCountY; y++) {
+        for(int x= 0; x < config.particleCountX; x++){
+            int i = y*config.particleCountX + x;
+//            data[i * 4 + 0] = x;
+//            data[i * 4 + 1] = y;
+            data[i * 4 + 0] = config.width * (rand() / float(RAND_MAX));
+            data[i * 4 + 1] = config.height * (rand() / float(RAND_MAX));
+            data[i * 4 + 2] = 0.0;
+            data[i * 4 + 3] = 0.0;
+        }
     }
 
     glGenTextures(1, &particlePositionTexture);
